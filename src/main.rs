@@ -691,6 +691,15 @@ async fn main() {
 								println!("id: {}, not yet confirmed, peer: {}, value: {} sat, live: {}", hex_str(&chan_info.channel_id[..]), hex_str(&chan_info.remote_network_id.serialize()), chan_info.channel_value_satoshis, chan_info.is_live);
 							}
 						}
+					} else if line.as_bytes()[2] == 'g' as u8 {
+						let graph = router.list_graph();
+						println!("All vertices:");
+						for chan in graph.0.iter() {
+							println!("short_id: {}, node_a: {} node_b: {} enabled_a: {} enabled_b: {}", chan.short_channel_id, chan.a_node_id, chan.b_node_id, chan.a_enabled, chan.b_enabled);
+						}
+						for node in graph.1.iter() {
+							println!("node_id: {} last_update: {}", node.node_id, node.last_update);
+						}
 					} else {
 						println!("Listing of non-peer/channel objects not yet implemented");
 					}
