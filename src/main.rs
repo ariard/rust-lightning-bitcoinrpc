@@ -37,7 +37,7 @@ use lightning::util::config;
 use bitcoin::util::{bip32, bip143};
 use bitcoin::blockdata;
 use bitcoin::network::constants;
-use bitcoin::consensus::encode;
+use bitcoin::consensus::{encode, serialize};
 
 use bitcoin_hashes::Hash;
 use bitcoin_hashes::sha256d::Hash as Sha256dHash;
@@ -566,6 +566,7 @@ async fn main() {
 	println!("'l c' List details about all channels");
 	println!("'s invoice [amt]' Send payment to an invoice, optionally with amount as whole msat if its not in the invoice");
 	println!("'p amt' Gets a new invoice for receiving funds for the given amt in msat");
+	println!("'r chan' Gets signed latest local commitment transaction for channel indexed by funding_");
 	print!("> "); std::io::stdout().flush().unwrap();
 	let mut lines = BufReader::new(tokio::io::stdin()).lines();
 	while let Ok(Some(line)) = lines.next_line().await {
@@ -691,15 +692,6 @@ async fn main() {
 								println!("id: {}, not yet confirmed, peer: {}, value: {} sat, live: {}", hex_str(&chan_info.channel_id[..]), hex_str(&chan_info.remote_network_id.serialize()), chan_info.channel_value_satoshis, chan_info.is_live);
 							}
 						}
-					} else if line.as_bytes()[2] == 'g' as u8 {
-						let graph = router.list_graph();
-						println!("All vertices:");
-						for chan in graph.0.iter() {
-							println!("short_id: {}, node_a: {} node_b: {} enabled_a: {} enabled_b: {}", chan.short_channel_id, chan.a_node_id, chan.b_node_id, chan.a_enabled, chan.b_enabled);
-						}
-						for node in graph.1.iter() {
-							println!("node_id: {} last_update: {}", node.node_id, node.last_update);
-						}
 					} else {
 						println!("Listing of non-peer/channel objects not yet implemented");
 					}
@@ -817,6 +809,19 @@ async fn main() {
 						}
 					} else { println!("Invalid value"); }
 				},
+				0x72 => { // 'r'
+					if line.len() == 66 {
+						if let Some(channel_id) = hex_to_vec(&line[2..]) {
+							let mut monitors = monitor.monitor.monitors.lock().unwrap();
+							for (funding_info, monitor) in monitors.iter_mut() {
+								if funding_info.to_channel_id().to_vec() == channel_id {
+									let txn = monitor.get_latest_local_commitment_txn();
+									println!("{:?}", serialize(&txn[0]));
+								}
+							}
+						}
+					}
+				}
 				_ => println!("Unknown command: {}", line.as_bytes()[0] as char),
 			}
 		} else {
